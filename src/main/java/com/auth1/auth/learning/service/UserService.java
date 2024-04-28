@@ -1,17 +1,19 @@
 package com.auth1.auth.learning.service;
 
+import com.auth1.auth.learning.dtos.SendEmailMessageDto;
+import com.auth1.auth.learning.model.Role;
 import com.auth1.auth.learning.model.Token;
 import com.auth1.auth.learning.model.User;
 import com.auth1.auth.learning.repository.TokenRepository;
 import com.auth1.auth.learning.repository.UserRepository;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import java.util.Calendar;
-import java.util.Date;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 @Service
 public class UserService {
@@ -25,6 +27,12 @@ public class UserService {
     @Autowired
     private BCryptPasswordEncoder bCryptPasswordEncoder;
 
+    @Autowired
+    private KafkaTemplate<String,String> kafkaTemplate;
+
+    @Autowired
+    ObjectMapper objectMapper;
+
 
     public User signUp(String email, String password, String name){
 
@@ -32,7 +40,30 @@ public class UserService {
         user.setEmail(email);
         user.setName(name);
         user.setPassword(bCryptPasswordEncoder.encode(password));
-        return userRepository.save(user);
+        user.setRoles(new ArrayList<>());
+        user.setEmailVerified(true);
+
+        User savedUser = userRepository.save(user);
+
+        SendEmailMessageDto messageDto = new SendEmailMessageDto();
+        messageDto.setFrom("shikherkak@gmail.com");
+        messageDto.setTo(email);
+        messageDto.setSubject("This is a message from kash");
+        messageDto.setBody("Hiya!! Whatcha doin??");
+
+//        try {
+//            kafkaTemplate.send(
+//                    "sendEmail",
+//                    objectMapper.writeValueAsString(messageDto)
+//                    );
+//        }
+//        catch (JsonProcessingException e) {
+//            throw new RuntimeException(e);
+//        }
+
+        return savedUser;
+
+
     }
 
     public Token login(String email, String password) {
@@ -106,5 +137,16 @@ public class UserService {
             return false;
         }
         return true;
+    }
+
+    public String getUserEmail(String email) {
+        Optional<User> userOptional = userRepository.findByEmail(email);
+        if(userOptional.isEmpty())
+        {
+            return "Not Found";
+        }
+
+        User user = userOptional.get();
+        return user.getName();
     }
 }
